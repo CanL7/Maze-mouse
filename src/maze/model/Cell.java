@@ -55,7 +55,7 @@ public class Cell {
         this.visited = false;
         this.isPath = false;
         this.isBacktracked = false;
-        this.parent = null;
+        // parent 保留，供动画回放时路径恢复使用
     }
 
     /**
@@ -69,7 +69,7 @@ public class Cell {
         this.visited = false;
         this.isPath = false;
         this.isBacktracked = false;
-        this.parent = null;
+        // parent 保留，供动画回放时路径恢复使用
     }
 
     @Override
