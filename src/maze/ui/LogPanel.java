@@ -70,7 +70,8 @@ public class LogPanel extends JPanel {
         switch (type) {
             case VISIT     -> action = String.format("访问 (%d,%d)", row, col);
             case BACKTRACK -> action = String.format("回溯 (%d,%d) ← 死路", row, col);
-            case FOUND     -> action = String.format("★★★ 找到终点 (%d,%d)！ ★★★", row, col);
+            case FOUND     -> action = String.format("★★★ 找到一条可行路径，终点 (%d,%d)！ ★★★", row, col);
+            case SHORTEST_PATH -> action = String.format("最短路径已确定，终点 (%d,%d)", row, col);
             default        -> action = "未知操作";
         }
         append(String.format("步骤 %d — %s", stepNumber, action));

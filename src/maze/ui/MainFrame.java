@@ -1,6 +1,7 @@
 package maze.ui;
 
 import maze.algorithm.BFSPathFinder;
+import maze.algorithm.DFSAllPathFinder;
 import maze.algorithm.DFSPathFinder;
 import maze.algorithm.MazeGenerator;
 import maze.model.Maze;
@@ -32,10 +33,14 @@ public class MainFrame extends JFrame {
     private Maze maze;
     private DFSPathFinder dfsFinder;
     private BFSPathFinder bfsFinder;
+    private DFSAllPathFinder allPathFinder;
     private AnimationPlayer animator;
 
     private List<SearchStep> lastSteps;
-    private boolean lastSearchIsDFS;
+    private SearchMode lastSearchMode;
+    private int lastVisitedCount;
+    private int lastPathLength;
+    private int lastPathCount;
 
     // 动画状态追踪
     private int animVisited, animPathLen, animStackSize, animQueueSize;
@@ -47,7 +52,7 @@ public class MainFrame extends JFrame {
     private LogPanel logPanel;
     private JPanel sideLeft, sideRight;
 
-    private JButton btnGenerate, btnDFS, btnBFS, btnPlay, btnPause, btnReset;
+    private JButton btnGenerate, btnDFS, btnBFS, btnTraverse, btnPlay, btnPause, btnReset;
     private JButton btnImport, btnExport, btnToggleStatus, btnToggleLog;
     private JSlider speedSlider;
     private JLabel speedLabel, statusLabel;
@@ -127,6 +132,7 @@ public class MainFrame extends JFrame {
         btnGenerate = new JButton("生成迷宫");
         btnDFS      = new JButton("DFS 寻路");
         btnBFS      = new JButton("BFS 最短路径");
+        btnTraverse = new JButton("所有可行路径");
         btnPlay     = new JButton("▶ 播放");
         btnPause    = new JButton("⏸ 暂停");
         btnReset    = new JButton("↺ 重置");
@@ -136,6 +142,7 @@ public class MainFrame extends JFrame {
         bar.add(btnGenerate);
         bar.add(btnDFS);
         bar.add(btnBFS);
+        bar.add(btnTraverse);
         bar.add(Box.createHorizontalStrut(12));
         bar.add(btnPlay);
         bar.add(btnPause);
@@ -167,8 +174,9 @@ public class MainFrame extends JFrame {
 
     private void bindEvents() {
         btnGenerate.addActionListener(e -> generateMaze());
-        btnDFS.addActionListener(e -> quickSearch(true));
-        btnBFS.addActionListener(e -> quickSearch(false));
+        btnDFS.addActionListener(e -> runSearch(SearchMode.DFS_PATH));
+        btnBFS.addActionListener(e -> runSearch(SearchMode.BFS_PATH));
+        btnTraverse.addActionListener(e -> runSearch(SearchMode.ALL_PATHS));
         btnPlay.addActionListener(e -> startReplay());
         btnPause.addActionListener(e -> pauseAnimation());
         btnReset.addActionListener(e -> resetMaze());
@@ -257,6 +265,10 @@ public class MainFrame extends JFrame {
     private void setupMazeForUse() {
         mazePanel.setMaze(maze);
         lastSteps = null;
+        lastSearchMode = null;
+        lastVisitedCount = 0;
+        lastPathLength = 0;
+        lastPathCount = 0;
         logPanel.clear();
         statusPanel.reset();
 
@@ -271,21 +283,25 @@ public class MainFrame extends JFrame {
 
     // ============ 快速搜索 ============
 
-    private void quickSearch(boolean isDFS) {
+    private void runSearch(SearchMode mode) {
         if (maze == null) return;
 
-        lastSearchIsDFS = isDFS;
-        String algo = isDFS ? "DFS" : "BFS";
+        lastSearchMode = mode;
+        String algo = getModeLabel(mode);
+        boolean isAllPaths = mode == SearchMode.ALL_PATHS;
 
         logPanel.clear();
-        logPanel.append(algo + " 搜索启动");
+        logPanel.append(algo + (isAllPaths ? " 启动" : " 搜索启动"));
 
-        if (isDFS) {
+        if (mode == SearchMode.DFS_PATH) {
             dfsFinder = new DFSPathFinder(maze);
             lastSteps = dfsFinder.find();
-        } else {
+        } else if (mode == SearchMode.BFS_PATH) {
             bfsFinder = new BFSPathFinder(maze);
             lastSteps = bfsFinder.find();
+        } else {
+            allPathFinder = new DFSAllPathFinder(maze);
+            lastSteps = allPathFinder.findAllPaths();
         }
 
         for (SearchStep step : lastSteps)
@@ -293,21 +309,32 @@ public class MainFrame extends JFrame {
 
         mazePanel.repaint();
 
-        int visited = countVisited();
-        int pathLen = countPathLength();
+        int visited = isAllPaths ? allPathFinder.getExploredNodeCount() : countVisited();
+        int pathLen = isAllPaths ? allPathFinder.getShortestPathLength() : countPathLength();
+        boolean isDFSLike = isDFSLikeMode(mode);
 
-        statusPanel.setState("搜索完成");
+        lastVisitedCount = visited;
+        lastPathLength = pathLen;
+        lastPathCount = isAllPaths ? allPathFinder.getPathCount() : 0;
+
+        statusPanel.setState(isAllPaths ? "路径遍历完成" : "搜索完成");
         statusPanel.setAlgorithm(algo);
-        statusPanel.setStackSize(isDFS ? pathLen : 0);
-        statusPanel.setQueueSize(isDFS ? 0 : visited);
+        statusPanel.setStackSize(mode == SearchMode.DFS_PATH ? pathLen : 0);
+        statusPanel.setQueueSize(mode == SearchMode.BFS_PATH ? visited : 0);
         statusPanel.setVisited(visited);
         statusPanel.setPathLength(pathLen);
 
         state = State.FINISHED;
         updateButtonStates();
-        statusLabel.setText(String.format(
-            "%s 已找到路径！访问 %d 节点，路径长度 %d — 点击播放查看过程",
-            algo, visited, pathLen));
+        if (isAllPaths) {
+            statusLabel.setText(String.format(
+                "%s 已完成！共找到 %d 条可行路径，最短路径长度 %d — 点击播放查看过程",
+                algo, lastPathCount, pathLen));
+        } else {
+            statusLabel.setText(String.format(
+                "%s 已找到路径！访问 %d 节点，路径长度 %d — 点击播放查看过程",
+                algo, visited, pathLen));
+        }
     }
 
     // ============ 动画回放 ============
@@ -315,9 +342,10 @@ public class MainFrame extends JFrame {
     private void startReplay() {
         if (lastSteps == null || lastSteps.isEmpty()) return;
 
-        String algo = lastSearchIsDFS ? "DFS" : "BFS";
+        String algo = getModeLabel(lastSearchMode);
+        boolean isAllPaths = lastSearchMode == SearchMode.ALL_PATHS;
         logPanel.clear();
-        logPanel.append("开始回放 " + algo + " 搜索过程...");
+        logPanel.append("开始回放 " + algo + (isAllPaths ? " 过程..." : " 搜索过程..."));
 
         maze.resetSearchState();
         mazePanel.repaint();
@@ -355,20 +383,24 @@ public class MainFrame extends JFrame {
 
         if (step.type == StepType.VISIT) {
             animVisited++;
-            if (lastSearchIsDFS) animStackSize++;
+            if (isDFSLikeMode(lastSearchMode)) animStackSize++;
             else animQueueSize++;
         } else if (step.type == StepType.BACKTRACK) {
             animStackSize--;
-        } else if (step.type == StepType.FOUND) {
-            animPathLen = countPathLength();
-            animStackSize = 0;
-            animQueueSize = 0;
+        } else if (step.type == StepType.FOUND || step.type == StepType.SHORTEST_PATH) {
+            animPathLen = !step.pathCells.isEmpty() ? step.pathCells.size() : countPathLength();
+            if (lastSearchMode == SearchMode.BFS_PATH || lastSearchMode == SearchMode.DFS_PATH) {
+                animStackSize = 0;
+            }
+            if (step.type == StepType.SHORTEST_PATH || lastSearchMode == SearchMode.BFS_PATH) {
+                animQueueSize = 0;
+            }
         }
 
         statusPanel.setVisited(animVisited);
         statusPanel.setPathLength(animPathLen);
-        statusPanel.setStackSize(lastSearchIsDFS ? animStackSize : 0);
-        statusPanel.setQueueSize(lastSearchIsDFS ? 0 : animQueueSize);
+        statusPanel.setStackSize(isDFSLikeMode(lastSearchMode) ? animStackSize : 0);
+        statusPanel.setQueueSize(lastSearchMode == SearchMode.BFS_PATH ? animQueueSize : 0);
         statusPanel.setElapsedTime(System.currentTimeMillis() - animStartTime);
     }
 
@@ -389,8 +421,14 @@ public class MainFrame extends JFrame {
         statusPanel.setPathLength(animPathLen);
         state = State.FINISHED;
         updateButtonStates();
-        statusLabel.setText(String.format(
-            "回放完成 — 访问 %d 个节点，路径长度 %d", animVisited, animPathLen));
+        if (lastSearchMode == SearchMode.ALL_PATHS) {
+            statusLabel.setText(String.format(
+                "回放完成 — 共找到 %d 条可行路径，最短路径长度 %d",
+                lastPathCount, lastPathLength));
+        } else {
+            statusLabel.setText(String.format(
+                "回放完成 — 访问 %d 个节点，路径长度 %d", animVisited, animPathLen));
+        }
     }
 
     // ============ 重置 ============
@@ -412,25 +450,39 @@ public class MainFrame extends JFrame {
 
     private void updateButtonStates() {
         switch (state) {
-            case IDLE      -> setButtons(true, false, false, false, false, false, true);
-            case GENERATED -> setButtons(true, true, true, false, false, false, true);
-            case FINISHED  -> setButtons(true, true, true, true, false, true, true);
-            case SEARCHING -> setButtons(false, false, false, false, true, true, true);
-            case PAUSED    -> setButtons(false, false, false, true, false, true, true);
+            case IDLE      -> setButtons(true, false, false, false, false, false, false, true);
+            case GENERATED -> setButtons(true, true, true, true, false, false, false, true);
+            case FINISHED  -> setButtons(true, true, true, true, true, false, true, true);
+            case SEARCHING -> setButtons(false, false, false, false, false, true, true, true);
+            case PAUSED    -> setButtons(false, false, false, false, true, false, true, true);
         }
     }
 
-    private void setButtons(boolean gen, boolean dfs, boolean bfs,
+    private void setButtons(boolean gen, boolean dfs, boolean bfs, boolean traverse,
                             boolean play, boolean pause, boolean reset, boolean speed) {
         btnGenerate.setEnabled(gen);
         btnDFS.setEnabled(dfs);
         btnBFS.setEnabled(bfs);
+        btnTraverse.setEnabled(traverse);
         btnPlay.setEnabled(play);
         btnPause.setEnabled(pause);
         btnReset.setEnabled(reset);
         speedSlider.setEnabled(speed);
         btnImport.setEnabled(true);
         btnExport.setEnabled(maze != null);
+    }
+
+    private String getModeLabel(SearchMode mode) {
+        if (mode == null) return "搜索";
+        return switch (mode) {
+            case DFS_PATH -> "DFS";
+            case BFS_PATH -> "BFS";
+            case ALL_PATHS -> "所有可行路径";
+        };
+    }
+
+    private boolean isDFSLikeMode(SearchMode mode) {
+        return mode == SearchMode.DFS_PATH || mode == SearchMode.ALL_PATHS;
     }
 
     // ============ 统计 ============

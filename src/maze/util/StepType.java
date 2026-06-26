@@ -9,5 +9,6 @@ package maze.util;
 public enum StepType {
     VISIT,
     BACKTRACK,
-    FOUND
+    FOUND,
+    SHORTEST_PATH
 }

@@ -28,15 +28,18 @@ Phase 2
 
 Phase 3
 
-DFS寻路
+DFS寻路与所有可行路径遍历
 
 - DFSPathFinder
+- DFSAllPathFinder
 
 完成标准：
 
 找到一条可行路径
 
 展示回溯过程
+
+遍历起点到终点的所有可行路径
 
 ---
 

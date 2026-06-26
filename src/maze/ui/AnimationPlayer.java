@@ -236,8 +236,15 @@ public class AnimationPlayer {
         } else if (step.type == StepType.BACKTRACK) {
             step.cell.isBacktracked = true;
         } else if (step.type == StepType.FOUND) {
-            // FOUND 步骤：标记最终路径
-            markFinalPath();
+            clearPathMarks();
+            if (!step.pathCells.isEmpty()) {
+                markPath(step.pathCells);
+            } else {
+                markFinalPath();
+            }
+        } else if (step.type == StepType.SHORTEST_PATH) {
+            clearPathMarks();
+            markPath(step.pathCells);
         }
     }
 
@@ -249,6 +256,26 @@ public class AnimationPlayer {
         while (current != null) {
             current.isPath = true;
             current = current.parent;
+        }
+    }
+
+    /**
+     * 高亮指定路径。
+     */
+    private void markPath(List<maze.model.Cell> path) {
+        for (maze.model.Cell cell : path) {
+            cell.isPath = true;
+        }
+    }
+
+    /**
+     * 清除上一次高亮的路径。
+     */
+    private void clearPathMarks() {
+        for (int r = 0; r < maze.rows; r++) {
+            for (int c = 0; c < maze.cols; c++) {
+                maze.grid[r][c].isPath = false;
+            }
         }
     }
 

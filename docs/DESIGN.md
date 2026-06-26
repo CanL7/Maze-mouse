@@ -2,28 +2,29 @@
 
 ## 一、需求分析总结
 
-**核心目标**：实现一个 Java Swing 桌面应用，可视化展示迷宫生成、DFS 寻路、BFS 最短路径的完整过程。
+**核心目标**：实现一个 Java Swing 桌面应用，可视化展示迷宫生成、DFS 单路径寻路、所有可行路径遍历、BFS 最短路径的完整过程。
 
 **强制技术栈**：Java 17+ / Swing / Stack / Queue / 二维数组
 
-**必须实现的 7 项功能**：
+**必须实现的 8 项功能**：
 
 | # | 功能 | 关键约束 |
 |---|------|---------|
 | 1 | Prim 迷宫生成 | 随机、起点终点可达 |
 | 2 | DFS 寻路 | 展示探索 + 回溯 |
-| 3 | BFS 最短路径 | 统计路径长度、访问节点数 |
-| 4 | 实时动画 | Swing Timer、暂停/继续/调速 |
-| 5 | 日志系统 | 时间戳、实时刷新 |
-| 6 | 状态面板 | Stack/Queue/Visited 实时数值 |
-| 7 | Swing 图形界面 | 自适应布局、直观操作 |
+| 3 | 所有可行路径遍历 | 遍历起点到终点的全部可行路径 |
+| 4 | BFS 最短路径 | 统计路径长度、访问节点数 |
+| 5 | 实时动画 | Swing Timer、暂停/继续/调速 |
+| 6 | 日志系统 | 时间戳、实时刷新 |
+| 7 | 状态面板 | Stack/Queue/Visited 实时数值 |
+| 8 | Swing 图形界面 | 自适应布局、直观操作 |
 
 ---
 
 ## 二、程序状态机
 
 +"`"+
-IDLE ──[生成迷宫]──▶ GENERATED ──[DFS/BFS]──▶ SEARCHING
+IDLE ──[生成迷宫]──▶ GENERATED ──[DFS/BFS/遍历]──▶ SEARCHING
                          ▲                        │
                          │              ┌─────────┤
                          │              ▼         ▼
@@ -34,7 +35,7 @@ IDLE ──[生成迷宫]──▶ GENERATED ──[DFS/BFS]──▶ SEARCHING
 
 ---
 
-## 三、类设计（10 个类）
+## 三、类设计（12 个类）
 
 ### 1. Cell — 迷宫单元格
 
@@ -115,7 +116,23 @@ IDLE ──[生成迷宫]──▶ GENERATED ──[DFS/BFS]──▶ SEARCHING
 
 动画数据：每一步产生一个 SearchStep（当前格、操作类型）
 
-### 6. SearchStep — 搜索步骤记录
+### 6. DFSAllPathFinder — 所有可行路径遍历
+
+职责：用 DFS + Stack + 回溯遍历起点到终点的所有可行路径
+
+核心数据结构：Stack<Cell>
+
+算法流程：
+1. 起点入栈，标记 visited
+2. 沿可通行邻居继续深入搜索
+3. 每当到达终点，就记录一条完整可行路径
+4. 回溯后继续尝试其他分支，直到所有可行路径都被遍历完
+5. 根据遍历结果选出最短路径
+
+动画数据：每一步产生一个 SearchStep 记录（当前格、操作类型）
+- 操作类型：VISIT（探索）、BACKTRACK（回溯）、FOUND（找到一条可行路径）、SHORTEST_PATH（最短路径）
+
+### 7. SearchStep — 搜索步骤记录
 
 职责：记录搜索动画的每一步
 
@@ -126,7 +143,7 @@ IDLE ──[生成迷宫]──▶ GENERATED ──[DFS/BFS]──▶ SEARCHING
 | type | StepType | VISIT / BACKTRACK / FOUND_PATH |
 | stepNumber | int | 步骤序号 |
 
-### 7. AnimationPlayer — 动画控制器
+### 8. AnimationPlayer — 动画控制器
 
 职责：用 Swing Timer 逐帧播放搜索步骤
 
@@ -143,7 +160,7 @@ IDLE ──[生成迷宫]──▶ GENERATED ──[DFS/BFS]──▶ SEARCHING
 - play() / pause() / esume() / setSpeed(int)
 - 每帧回调：更新 MazePanel 绘制 + StatusPanel + LogPanel
 
-### 8. MazePanel — 迷宫绘制组件
+### 9. MazePanel — 迷宫绘制组件
 
 职责：JPanel 子类，绘制迷宫图形
 
@@ -165,7 +182,7 @@ IDLE ──[生成迷宫]──▶ GENERATED ──[DFS/BFS]──▶ SEARCHING
 | 最终最短路径 | 黄色 |
 | 背景 | 浅灰色 |
 
-### 9. LogPanel — 日志面板
+### 10. LogPanel — 日志面板
 
 职责：JTextArea（只读），实时输出搜索日志
 
@@ -177,7 +194,7 @@ IDLE ──[生成迷宫]──▶ GENERATED ──[DFS/BFS]──▶ SEARCHING
 - [10:23:45.789] 回溯节点 (0,1) ← 死路
 - [10:23:46.012] 找到终点 (9,9)！
 
-### 10. StatusPanel — 状态面板
+### 11. StatusPanel — 状态面板
 
 职责：JPanel，显示实时运行状态
 
@@ -192,7 +209,7 @@ IDLE ──[生成迷宫]──▶ GENERATED ──[DFS/BFS]──▶ SEARCHING
 | 当前路径长度 | 当前已走步数 |
 | 运行耗时 | 搜索用时 |
 
-### 11. MainFrame — 主窗口
+### 12. MainFrame — 主窗口
 
 职责：JFrame，组装所有组件，管理按钮事件
 
@@ -202,7 +219,7 @@ IDLE ──[生成迷宫]──▶ GENERATED ──[DFS/BFS]──▶ SEARCHING
 ┌──────────────────────────────────────────┐
 │               MazePanel                   │  CENTER
 ├──────────────────────────────────────────┤
-│ [生成迷宫] [DFS寻路] [BFS最短路径]         │
+│ [生成迷宫] [DFS寻路] [所有可行路径] [BFS最短路径] │
 │ [▶播放] [⏸暂停] [↺重置] [速度: ===o====] │  SOUTH(top)
 ├───────────────────┬──────────────────────┤
 │    StatusPanel    │      LogPanel        │  SOUTH(bottom)
@@ -224,6 +241,13 @@ IDLE ──[生成迷宫]──▶ GENERATED ──[DFS/BFS]──▶ SEARCHING
   → 返回 List<SearchStep>
   → AnimationPlayer.play(steps)
   → 每帧：更新 Cell 状态 → MazePanel.repaint() → StatusPanel.update() → LogPanel.append()
+
+用户点击 [所有可行路径]
+  → MainFrame 调用 DFSAllPathFinder.findAllPaths()
+  → 返回 List<SearchStep>
+  → AnimationPlayer.play(steps)
+  → 每帧：更新 Cell 状态 → MazePanel.repaint() → StatusPanel.update() → LogPanel.append()
+  → 遍历结束后：高亮所有通路中的最短路径
 
 用户点击 [BFS]
   → 同上，使用 BFSPathFinder
@@ -269,13 +293,15 @@ maze/
 ├── algorithm/
 │   ├── MazeGenerator.java   Prim 生成
 │   ├── DFSPathFinder.java   DFS 寻路
-│   └── BFSPathFinder.java   BFS 寻路
+│   ├── DFSAllPathFinder.java 所有可行路径
+│   └── BFSPathFinder.java   BFS 最短路径
 ├── ui/
 │   ├── MainFrame.java       主窗口
 │   ├── MazePanel.java       迷宫绘制
 │   ├── LogPanel.java        日志面板
 │   ├── StatusPanel.java     状态面板
-│   └── AnimationPlayer.java 动画控制器
+│   ├── AnimationPlayer.java 动画控制器
+│   └── SearchMode.java      搜索模式枚举
 └── util/
     └── StepType.java        步骤类型枚举
 +"`"+
@@ -289,11 +315,11 @@ maze/
 | 1 | Cell + Maze | 数据层就绪 |
 | 2 | MazeGenerator (Prim) | 迷宫可生成 |
 | 3 | DFSPathFinder | DFS 搜索步骤生成 |
-| 4 | BFSPathFinder | BFS 搜索步骤 + 最短路径 |
-| 5 | MainFrame + MazePanel | 可视化界面 |
-| 6 | AnimationPlayer | 动画播放 |
-| 7 | LogPanel | 日志输出 |
-| 8 | StatusPanel | 状态展示 |
+| 4 | DFSAllPathFinder | 所有可行路径遍历与最短路径统计 |
+| 5 | BFSPathFinder | BFS 搜索步骤 + 最短路径 |
+| 6 | MainFrame + MazePanel | 可视化界面 |
+| 7 | AnimationPlayer | 动画播放 |
+| 8 | LogPanel + StatusPanel | 运行信息展示 |
 | 9 | 界面美化 + 注释 + 测试 | 答辩就绪 |
 
 ---
@@ -304,6 +330,7 @@ maze/
 |-----------|-------------|
 | Prim 迷宫生成 | MazeGenerator |
 | DFS + Stack | DFSPathFinder + Stack\<Cell\> |
+| 所有可行路径遍历 | DFSAllPathFinder + Stack\<Cell\> + 回溯 |
 | BFS + Queue | BFSPathFinder + Queue\<Cell\> |
 | 实时动画 + 暂停/继续/调速 | AnimationPlayer + Swing Timer |
 | 日志系统 | LogPanel |
